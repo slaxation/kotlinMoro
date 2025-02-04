@@ -1,43 +1,36 @@
 package com.slaxation.kotlinMoro.model
 
-import com.fasterxml.jackson.annotation.JsonProperty
+import com.slaxation.kotlinMoro.constants.UserConstants
 import jakarta.persistence.*
-import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
-import lombok.Getter
-import lombok.Setter
 import java.io.Serializable
 
-import com.slaxation.kotlinMoro.constants.UserConstants
-import lombok.AllArgsConstructor
 import org.springframework.security.core.GrantedAuthority
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
 
 @Entity
-@Getter
-@Setter
 @Table(name = "users")
-data class User : Serializable, UserDetails {
+data class User (
 
-    @field:Id
-    @field:GeneratedValue(strategy = GenerationType.IDENTITY)
-    private val id: Long
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long? = null,
 
     @field:Size(min = UserConstants.USERNAME_LENGTH_MIN)
     @field:Size(max = UserConstants.USERNAME_LENGTH_MAX)
-    private lateinit var username: String
+    var username: String,
 
     @field:Size(min = UserConstants.PASSWORD_LENGTH_MIN)
-    private lateinit var password: String
+    var password: String,
 
-    private lateinit var authorities: List<GrantedAuthority>
+    @ManyToMany(fetch = FetchType.EAGER)
+    var roles: Set<Role> = emptySet(),
 
-    @JsonProperty("name")
     @field:Size(max = UserConstants.NAME_LENGTH_MAX)
-    private var name: String = ""
-    override fun getAuthorities(): MutableCollection<out GrantedAuthority> {
-        TODO("Not yet implemented")
-    }
+    var name: String? = null
+
+) : Serializable, UserDetails {
 
     override fun getPassword(): String {
         return password
@@ -46,4 +39,15 @@ data class User : Serializable, UserDetails {
     override fun getUsername(): String {
         return username
     }
+
+    override fun getAuthorities(): Collection<GrantedAuthority> {
+        return roles.map { SimpleGrantedAuthority(it.name) }
+    }
+    override fun isAccountNonExpired() = true  // A method with an expression body, no `{}` required.
+
+    override fun isAccountNonLocked() = true  // Similarly, expression body.
+
+    override fun isCredentialsNonExpired() = true  // Expression body.
+
+    override fun isEnabled() = true  // Expression body.
 }
