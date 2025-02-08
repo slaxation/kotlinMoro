@@ -19,10 +19,10 @@ data class User (
 
     @field:Size(min = UserConstants.USERNAME_LENGTH_MIN)
     @field:Size(max = UserConstants.USERNAME_LENGTH_MAX)
-    var username: String,
+    private var username: String,
 
     @field:Size(min = UserConstants.PASSWORD_LENGTH_MIN)
-    var password: String,
+    private var password: String,
 
     @ManyToMany(fetch = FetchType.EAGER)
     var roles: Set<Role> = emptySet(),
@@ -32,12 +32,19 @@ data class User (
 
 ) : Serializable, UserDetails {
 
+
+    override fun getUsername(): String {
+        return username
+    }
+
+
+    // Override getPassword method for UserDetails interface
     override fun getPassword(): String {
         return password
     }
 
-    override fun getUsername(): String {
-        return username
+    fun setPassword(pass: String) {
+        password = pass
     }
 
     override fun getAuthorities(): Collection<GrantedAuthority> {
@@ -50,4 +57,5 @@ data class User (
     override fun isCredentialsNonExpired() = true  // Expression body.
 
     override fun isEnabled() = true  // Expression body.
+
 }

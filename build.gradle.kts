@@ -1,4 +1,4 @@
-val mapstructVersion = "1.5.3.Final"
+val mapstructVersion = "1.6.3"
 
 plugins {
     kotlin("jvm") version "1.9.25"
@@ -6,8 +6,8 @@ plugins {
     id("org.springframework.boot") version "3.4.2"
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("plugin.jpa") version "1.9.25"
-    kotlin("kapt") version "1.9.0"
-    kotlin("plugin.allopen") version "1.9.0"
+    kotlin("kapt") version "1.9.25"
+    kotlin("plugin.allopen") version "1.9.25"
 
 }
 
@@ -52,6 +52,10 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict")
     }
+}
+
+kapt {
+    includeCompileClasspath = false
 }
 
 allOpen {

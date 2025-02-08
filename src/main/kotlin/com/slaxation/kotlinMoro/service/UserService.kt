@@ -4,10 +4,19 @@ import com.slaxation.kotlinMoro.dto.ChangePasswordDTO
 import com.slaxation.kotlinMoro.dto.RegisterUserDTO
 import com.slaxation.kotlinMoro.dto.UpdateUserDTO
 import com.slaxation.kotlinMoro.dto.UserDTO
+import com.slaxation.kotlinMoro.event.UserUpdatedEvent
+import com.slaxation.kotlinMoro.exception.ForbiddenException
+import com.slaxation.kotlinMoro.exception.NotFoundException
+import com.slaxation.kotlinMoro.exception.enumeration.GenericErrorCode
+import com.slaxation.kotlinMoro.mapper.UpdateUserMapper
 import com.slaxation.kotlinMoro.mapper.UserMapper
 import com.slaxation.kotlinMoro.model.User
 import com.slaxation.kotlinMoro.repository.UserRepository
 import jakarta.transaction.Transactional
+import jakarta.validation.Valid
+import org.springframework.context.ApplicationEventPublisher
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Service
@@ -17,8 +26,17 @@ class UserService(
 
     private val userRepository: UserRepository,
     private val passwordEncoder: BCryptPasswordEncoder,
-    private val userMapper: UserMapper
+    private val userMapper: UserMapper,
+    private val updateUserMapper: UpdateUserMapper,
+    private val applicationEventPublisher: ApplicationEventPublisher
 ) {
+
+
+    fun getUserById(id: Long): UserDTO {
+        return userMapper.entityToDto(userRepository.findById(id).orElseThrow {
+            NotFoundException(GenericErrorCode.NOT_FOUND_ERROR.toString(), "User with userId: $id was not found.")
+        })
+    }
 
     // Register a new user
     @Transactional
@@ -27,6 +45,7 @@ class UserService(
             userRepository.findByUsername(registerUserDTO.username) != null -> {
                 throw IllegalArgumentException("Username already exists")
             }
+
             else -> {
                 val encodedPassword = passwordEncoder.encode(registerUserDTO.password)
                 val newUser = User(
@@ -40,19 +59,6 @@ class UserService(
         }
     }
 
-    // Update user details (username, name)
-    @Transactional
-    fun updateUserDetails(userId: Long, updateUserDTO: UpdateUserDTO): User {
-        val user = userRepository.findById(userId).orElseThrow {
-            UsernameNotFoundException("User not found")
-        }
-
-        user.username = updateUserDTO.username
-        user.name = updateUserDTO.name
-
-        return userRepository.save(user)
-    }
-
     // Change user password
     @Transactional
     fun changePassword(id: Long, changePasswordDTO: ChangePasswordDTO): String {
@@ -64,6 +70,7 @@ class UserService(
             !passwordEncoder.matches(changePasswordDTO.oldPassword, user.password) -> {
                 throw IllegalArgumentException("Old password is incorrect")
             }
+
             else -> {
                 user.password = passwordEncoder.encode(changePasswordDTO.newPassword)
                 userRepository.save(user)
@@ -71,5 +78,59 @@ class UserService(
                 return "Password changed successfully"
             }
         }
+    }
+
+    fun getAllUsers(): List<UserDTO> {
+        return userRepository.findAll()
+            .stream()
+            .map(userMapper::entityToDto)
+            .toList()
+    }
+
+    @Transactional
+    fun updateLoggedInUser(userRequest: @Valid UpdateUserDTO): UserDTO {
+        //retrieve logged in user
+
+        val loggedInUser: UserDetails = getLoggedInUser()
+
+        //check whether logged-in user is same user as the one from updateRequest
+        if (userRequest.username != loggedInUser.username) {
+            val msg =
+                String.format("You need to be logged into '" + userRequest.username + "' to be able to update it!")
+            throw ForbiddenException(GenericErrorCode.FORBIDDEN_ERROR.toString(), msg)
+        }
+
+        //retrieve UserEntity from database
+        val u: User? = userRepository.findByUsername(userRequest.username)
+
+        if (u == null) {
+            val msg = "User: ${userRequest.username} was not found."
+            throw NotFoundException(GenericErrorCode.NOT_FOUND_ERROR.toString(), msg)
+        }
+
+        updateUserMapper.dtoToEntity(userRequest, u)
+
+        //persist changes
+        val savedUser: User = userRepository.save(u)
+
+        //trigger event
+        applicationEventPublisher.publishEvent(UserUpdatedEvent(this, savedUser.getUsername()))
+
+        //return updated entity
+        return userMapper.entityToDto(savedUser)
+    }
+
+    fun deleteUser(username: String) {
+        val msg = String.format("User: $username was not found.")
+
+        val user = userRepository.findByUsername(username)
+            ?: throw NotFoundException(GenericErrorCode.NOT_FOUND_ERROR.toString(), msg)
+
+        userRepository.delete(user)
+        SecurityContextHolder.clearContext()
+    }
+
+    fun getLoggedInUser() : User {
+        return SecurityContextHolder.getContext().authentication.principal as User
     }
 }
