@@ -11,25 +11,28 @@ import com.slaxation.kotlinMoro.exception.enumeration.GenericErrorCode
 import com.slaxation.kotlinMoro.mapper.UpdateUserMapper
 import com.slaxation.kotlinMoro.mapper.UserMapper
 import com.slaxation.kotlinMoro.model.User
+import com.slaxation.kotlinMoro.repository.RoleRepository
 import com.slaxation.kotlinMoro.repository.UserRepository
 import jakarta.transaction.Transactional
 import jakarta.validation.Valid
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetails
+import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.core.userdetails.UsernameNotFoundException
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
 @Service
 class UserService(
 
     private val userRepository: UserRepository,
-    private val passwordEncoder: BCryptPasswordEncoder,
+    private val passwordEncoder: PasswordEncoder,
     private val userMapper: UserMapper,
     private val updateUserMapper: UpdateUserMapper,
-    private val applicationEventPublisher: ApplicationEventPublisher
-) {
+    private val applicationEventPublisher: ApplicationEventPublisher,
+    private val roleRepository: RoleRepository
+) : UserDetailsService {
 
 
     fun getUserById(id: Long): UserDTO {
@@ -41,22 +44,23 @@ class UserService(
     // Register a new user
     @Transactional
     fun registerUser(registerUserDTO: RegisterUserDTO): UserDTO {
-        when {
-            userRepository.findByUsername(registerUserDTO.username) != null -> {
-                throw IllegalArgumentException("Username already exists")
-            }
 
-            else -> {
-                val encodedPassword = passwordEncoder.encode(registerUserDTO.password)
-                val newUser = User(
-                    username = registerUserDTO.username,
-                    password = encodedPassword,
-                    name = registerUserDTO.name
-                )
+        require(userRepository.findByUsername(registerUserDTO.username) == null) { "Username already exists" }
 
-                return userMapper.entityToDto(userRepository.save(newUser))
-            }
-        }
+        // Assign default role "USER"
+        val defaultRole = roleRepository.findByName("USER")
+            ?: throw IllegalStateException("Default role 'USER' not found in database!")
+
+        val encodedPassword = passwordEncoder.encode(registerUserDTO.password)
+        val newUser = User(
+            username = registerUserDTO.username,
+            password = encodedPassword,
+            name = registerUserDTO.name,
+            roles = setOf(defaultRole)
+        )
+
+        return userMapper.entityToDto(userRepository.save(newUser))
+
     }
 
     // Change user password
@@ -130,7 +134,16 @@ class UserService(
         SecurityContextHolder.clearContext()
     }
 
-    fun getLoggedInUser() : User {
+    fun getLoggedInUser(): User {
         return SecurityContextHolder.getContext().authentication.principal as User
     }
+
+    override fun loadUserByUsername(username: String): UserDetails {
+        val user = userRepository.findByUsername(username)
+            ?: throw UsernameNotFoundException("User not found: $username")
+
+        // Map User entity to UserDetails object
+        return user
+    }
+
 }

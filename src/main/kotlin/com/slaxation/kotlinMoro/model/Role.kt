@@ -11,6 +11,10 @@ data class Role(
     val id: Long? = null,
 
     @Column(unique = true, nullable = false)
-    val name: String  // Example: ROLE_USER, ROLE_ADMIN
+    val name: String,  // Example: ROLE_USER, ROLE_ADMIN
+
+    @ManyToMany(mappedBy = "roles")  // The 'roles' collection in User entity
+    val users: Set<User> = emptySet()
+
 
 )

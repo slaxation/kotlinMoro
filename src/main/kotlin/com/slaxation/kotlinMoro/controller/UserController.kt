@@ -7,17 +7,19 @@ import com.slaxation.kotlinMoro.dto.UserDTO
 import com.slaxation.kotlinMoro.service.UserService
 import jakarta.validation.Valid
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.User
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/users")
 class UserController(val userService: UserService) {
 
     @GetMapping("/id/{id}", produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun getUserById(@PathVariable id: Long): UserDTO {
-        return userService.getUserById(id)
+    fun getUserById(@PathVariable id: Long): ResponseEntity<UserDTO> {
+        val userDTO = userService.getUserById(id)
+        return ResponseEntity.ok(userDTO)
     }
 
     @PostMapping("/register")

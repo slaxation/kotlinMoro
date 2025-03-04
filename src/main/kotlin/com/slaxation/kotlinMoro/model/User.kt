@@ -25,7 +25,7 @@ data class User (
     private var password: String,
 
     @ManyToMany(fetch = FetchType.EAGER)
-    var roles: Set<Role> = emptySet(),
+    val roles: Set<Role>,
 
     @field:Size(max = UserConstants.NAME_LENGTH_MAX)
     var name: String? = null
@@ -36,7 +36,6 @@ data class User (
     override fun getUsername(): String {
         return username
     }
-
 
     // Override getPassword method for UserDetails interface
     override fun getPassword(): String {
