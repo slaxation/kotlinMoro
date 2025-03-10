@@ -41,7 +41,6 @@ class UserService(
         })
     }
 
-    // Register a new user
     @Transactional
     fun registerUser(registerUserDTO: RegisterUserDTO): UserDTO {
 
